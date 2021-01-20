@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<style>
+    .divRow{
+        padding-bottom: 20px;
+    }
+    .notificationDiv{
+        font-size: 40px; color: red;padding-bottom: 10px;display: none;
+    }
+</style>
+<body>
+    <div class="divRow">
+        <h3>Create Bezel Image</h3>
+    </div>
+    <div class="divRow">
+        <label>Select Device: </label>
+        <select id='devicesDD'></select>
+    </div>
+    <div class="divRow">
+        <label>Device MetaData</label>
+        <br/>
+        <label>Height: </label> 
+        <label></label>
+        <br/>
+        <label>Width: </label> 
+        <label></label>
+        <br/>
+        <label>*** Will try to resize image to fit Bezel ***</label>
+    </div>
+    <div class="divRow">
+        <div id="notificationDiv" class="notificationDiv"></div>
+        <input type="file" id="fileInput" multiple/>
+        <button onclick="Download()">Download</button>
+    </div>
+    <div>
+        <canvas id="image-canvas" crossorigin="anonymous"></canvas>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+    var deviceTemplates = [
+        {
+            id: 1,
+            name: "iPhone",
+            xaxis: 48,
+            yaxis: 41,
+            height: 1414,
+            width: 652,
+            path: "Shell.png"
+        },
+        {
+            id: 2,
+            name: "iPhone Mini",
+            xaxis: 38,
+            yaxis: 33,
+            height: 1130,
+            width: 525,
+            path: "ShellMini.png"
+        }
+    ];
+    var activeDevice = deviceTemplates[0];
+    var multiFile = false;
+
+    function PopulateDeviceDropdown(){
+        var select = document.getElementById("devicesDD"); 
+        for(var i = 0; i < deviceTemplates.length; i++) {
+            var opt = deviceTemplates[i];
+            var el = document.createElement("option");
+            el.textContent = opt.name;
+            el.value = opt.id;
+            select.appendChild(el);
+        }
+        select.addEventListener('change', DeviceChange, false);
+    }
+
+    function DeviceChange(){
+        document.getElementById('fileInput').value = null;
+        var select = document.getElementById("devicesDD"); 
+        for(var i = 0; i < deviceTemplates.length; i++) {
+            if(select.value == deviceTemplates[i].id)
+                activeDevice = deviceTemplates[i];
+        }
+        RenderDevice();
+    }
+
+    function RenderDevice(){
+       // Create a variable for the canvas and it's context
+        var canvas = document.getElementById("image-canvas");
+        var ctx = canvas.getContext("2d");
+
+        // Initialise an image object
+        var image = new Image();
+
+        // When it loads an image
+        image.onload = function() {
+        // Get the canvas' current style
+        var canvasStyle = getComputedStyle(canvas);
+        
+        // Get it's current width, minus the px at the end
+        var canvasWidth = this.width;
+        
+        // Work out the images ratio
+        var imageRatio = this.width/this.height;
+        
+        // Work out the new height of the canvas, keeping in ratio with the image
+        var canvasHeight = canvasWidth/imageRatio;
+        
+        // Set the canvas' height in the style tag to be correct
+        canvas.style.height = canvasHeight+"px";
+        
+        // Set the width/height attributes to be correct (as this is what drawImage uses)
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        
+        // Draw the image at the right width/height
+        ctx.drawImage(this, 0, 0, canvasWidth, canvasHeight);
+        };
+        // Load an image
+        image.src= activeDevice.path;
+    }
+
+    function ImageLoader(index) {
+        if(index == undefined || index == null)
+            index = 0;
+        var canvas = document.getElementById("image-canvas");
+        var ctx = canvas.getContext("2d");
+        var canvasStyle = getComputedStyle(canvas);
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            img = new Image();
+            img.onload = function(){
+                var image = new Image();
+
+                image.onload = function() {
+                    var shellRatio = this.width/this.height;
+                    var shellWidth = this.width;
+
+                    var imageRatio = img.width/img.height;
+                    if(imageRatio != shellRatio)
+                        ShowNotification("Warning: The aspect ratio of the image uploaded does not match the ratio of the available space!");
+
+                    var canvasHeight = shellWidth/shellRatio;
+
+                    if(img.width > activeDevice.width)
+                        img.width = activeDevice.width;
+                    if(img.height > activeDevice.height)
+                        img.height = activeDevice.height;
+                    if(img.width < activeDevice.width)
+                        img.width = activeDevice.width;
+                    if(img.height < activeDevice.height)
+                        img.height = activeDevice.height;
+                           
+                    canvas.style.height = canvasHeight+"px";
+                    canvas.width = shellWidth;
+                    canvas.height = canvasHeight;
+
+                    ctx.drawImage(img,activeDevice.xaxis,activeDevice.yaxis, activeDevice.width, activeDevice.height);
+                    ctx.drawImage(image, 0, 0, shellWidth, canvasHeight);
+
+                    if(multiFile)
+                        Download(document.getElementById('fileInput').files[index].name);
+                };
+                image.src= activeDevice.path;
+            }
+            img.src = reader.result;
+        }
+        reader.readAsDataURL(fileInput.files[index]);
+    }
+
+    function InitalizeImageLoader(){
+        var numFiles = document.getElementById('fileInput').files.length;
+        if(numFiles > 1)
+            multiFile = true;
+        else
+            multiFile = false;
+        for (i = 0; i < numFiles; ++i) {
+            ImageLoader(i);
+        }
+    }
+
+    function Download(fileName){
+        if(fileName == undefined)
+            fileName = document.getElementById('fileInput').files[0].name;
+
+        var canvas = document.getElementById("image-canvas");
+        var image = canvas.toDataURL();  
+
+        var tmpLink = document.createElement( 'a' );  
+        tmpLink.download = 'Bezel_' + fileName + '.png';  
+        tmpLink.href = image;  
+
+        document.body.appendChild( tmpLink );  
+        tmpLink.click();  
+        document.body.removeChild( tmpLink );  
+    }
+
+    function ShowNotification(message){
+        document.getElementById("notificationDiv").innerHTML = message;
+        $("#notificationDiv").show().delay(5000).fadeOut();
+    }
+
+    function OnLoad(){
+        var fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', InitalizeImageLoader, false);
+
+        RenderDevice();    
+        PopulateDeviceDropdown();
+    }
+
+    OnLoad();
+</script>
+</html>
