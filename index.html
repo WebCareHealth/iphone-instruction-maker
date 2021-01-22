@@ -1,213 +1,231 @@
 <!DOCTYPE html>
 <html>
-<style>
-    .divRow{
-        padding-bottom: 20px;
-    }
-    .notificationDiv{
-        font-size: 40px; color: red;padding-bottom: 10px;display: none;
-    }
-</style>
-<body>
-    <div class="divRow">
-        <h3>Create Bezel Image</h3>
-    </div>
-    <div class="divRow">
-        <label>Select Device: </label>
-        <select id='devicesDD'></select>
-    </div>
-    <div class="divRow">
-        <label>Device MetaData</label>
-        <br/>
-        <label>Height: </label> 
-        <label></label>
-        <br/>
-        <label>Width: </label> 
-        <label></label>
-        <br/>
-        <label>*** Will try to resize image to fit Bezel ***</label>
-    </div>
-    <div class="divRow">
-        <div id="notificationDiv" class="notificationDiv"></div>
-        <input type="file" id="fileInput" multiple/>
-        <button onclick="Download()">Download</button>
-    </div>
-    <div>
+<head>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://rawgit.com/enyo/dropzone/master/dist/dropzone.css">
+    <link rel="stylesheet" href="iphone-instruction-maker.css"/>
+</head>
+
+<body class="container">    
+  <div class="row">
+    <div id="left-col" class="col">
+        <div class="divRow">
+            <h1>Bezel Image Creator</h1>
+        </div>
+        <div class="divRow">
+            <h3>As easy as 1-2-3</h3>
+            <div class="card">
+                <div class="card-body">
+                    <ol>
+                        <li>Select Phone</li>
+                        <li>Drag and Drop Images - Program will automatically try to resize</li>
+                        <li>Download Bezel Images</li>
+                      </ul>
+                </div>
+              </div>
+        </div>
+        <div class="divRow">
+            <label>Devices </label>
+            <br/>
+            <div style="height: 25px;">
+                <div class="mx-button">
+                    <input type="radio" name="mx" id="button1" checked onchange="DeviceChange(1)">
+                    <label for="button1" unselectable>iPhone X</label>
+                </div>
+         <!--        <div class="mx-button">
+                    <input type="radio" name="mx" id="button2" onchange="DeviceChange(2)">
+                    <label for="button2" unselectable>Button 2</label>
+                </div> -->
+            </div>
+        </div>
+        <div class="divRow">
+            <label>Device MetaData</label>
+            <br/>
+            <label>Height: </label> 
+            <label id="deviceHeight"></label>
+            <br/>
+            <label>Width: </label> 
+            <label id="deviceWidth"></label>
+        </div>
+        <div class="divRow">
+            <div id="notificationDiv" class="notificationDiv"></div>
+            <form action="#"
+                class="dropzone"
+                id="dropzone"></form>
+        </div>
+        <div class="divRow" style="text-align: center;">
+            <button class="btn btn-primary" onclick="Download()">Download</button>
+            <button class="btn btn-warning" onclick="Reset()">Reset</button>
+        </div>
+   </div>
+    <div id="image-canvas-div" class="col">
         <canvas id="image-canvas" crossorigin="anonymous"></canvas>
     </div>
+  </div>
 </body>
+</html>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script src="https://rawgit.com/enyo/dropzone/master/dist/dropzone.js"></script>
 <script>
     var deviceTemplates = [
         {
             id: 1,
-            name: "iPhone",
-            xaxis: 48,
-            yaxis: 41,
-            height: 1414,
-            width: 652,
-            path: "Shell.png"
-        },
-        {
-            id: 2,
-            name: "iPhone Mini",
-            xaxis: 38,
-            yaxis: 33,
-            height: 1130,
-            width: 525,
-            path: "ShellMini.png"
+            name: "iPhone X",
+            xaxis: 32,
+            yaxis: 26,
+            height: 974,
+            width: 447,
+            path: "iPhone-X.png"
         }
     ];
     var activeDevice = deviceTemplates[0];
-    var multiFile = false;
 
-    function PopulateDeviceDropdown(){
-        var select = document.getElementById("devicesDD"); 
-        for(var i = 0; i < deviceTemplates.length; i++) {
-            var opt = deviceTemplates[i];
-            var el = document.createElement("option");
-            el.textContent = opt.name;
-            el.value = opt.id;
-            select.appendChild(el);
-        }
-        select.addEventListener('change', DeviceChange, false);
+function DeviceChange(id) {
+    for (var i = 0; i < deviceTemplates.length; i++) {
+        if (id == deviceTemplates[i].id)
+            activeDevice = deviceTemplates[i];
     }
+    document.getElementById("deviceHeight").innerText = activeDevice.height + " px";
+    document.getElementById("deviceWidth").innerText = activeDevice.width + " px";
+    var numFiles = Dropzone.forElement(".dropzone").files.length;
+    if(numFiles == 0)
+        return RenderDevice();
+    for (i = 0; i < numFiles; ++i) 
+        ImageLoader(i);
+}
 
-    function DeviceChange(){
-        document.getElementById('fileInput').value = null;
-        var select = document.getElementById("devicesDD"); 
-        for(var i = 0; i < deviceTemplates.length; i++) {
-            if(select.value == deviceTemplates[i].id)
-                activeDevice = deviceTemplates[i];
-        }
-        RenderDevice();
-    }
+function RenderDevice() {
+    // Create a variable for the canvas and it's context
+    var canvas = document.getElementById("image-canvas");
+    var ctx = canvas.getContext("2d");
 
-    function RenderDevice(){
-       // Create a variable for the canvas and it's context
-        var canvas = document.getElementById("image-canvas");
-        var ctx = canvas.getContext("2d");
+    // Initialise an image object
+    var image = new Image();
 
-        // Initialise an image object
-        var image = new Image();
-
-        // When it loads an image
-        image.onload = function() {
+    // When it loads an image
+    image.onload = function () {
         // Get the canvas' current style
         var canvasStyle = getComputedStyle(canvas);
-        
+
         // Get it's current width, minus the px at the end
         var canvasWidth = this.width;
-        
+
         // Work out the images ratio
-        var imageRatio = this.width/this.height;
-        
+        var imageRatio = this.width / this.height;
+
         // Work out the new height of the canvas, keeping in ratio with the image
-        var canvasHeight = canvasWidth/imageRatio;
-        
+        var canvasHeight = canvasWidth / imageRatio;
+
         // Set the canvas' height in the style tag to be correct
-        canvas.style.height = canvasHeight+"px";
-        
+        canvas.style.height = canvasHeight + "px";
+
         // Set the width/height attributes to be correct (as this is what drawImage uses)
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
-        
+
         // Draw the image at the right width/height
         ctx.drawImage(this, 0, 0, canvasWidth, canvasHeight);
-        };
-        // Load an image
-        image.src= activeDevice.path;
-    }
+        DeviceChange(1);
+    };
+    // Load an image
+    image.src = activeDevice.path;
+}
 
-    function ImageLoader(index) {
-        if(index == undefined || index == null)
-            index = 0;
-        var canvas = document.getElementById("image-canvas");
-        var ctx = canvas.getContext("2d");
-        var canvasStyle = getComputedStyle(canvas);
+function ImageLoader(index) {
+    if (index == undefined || index == null)
+        index = 0;
+    var canvas = document.getElementById("image-canvas");
+    var ctx = canvas.getContext("2d");
 
-        var reader = new FileReader();
-        reader.onload = function(event) {
-            img = new Image();
-            img.onload = function(){
-                var image = new Image();
+    var reader = new FileReader();
+    reader.onload = function (event) {
+        img = new Image();
+        img.onload = function () {
+            var image = new Image();
 
-                image.onload = function() {
-                    var shellRatio = this.width/this.height;
-                    var shellWidth = this.width;
+            image.onload = function () {
+                var shellRatio = this.width / this.height;
+                var shellWidth = this.width;
 
-                    var imageRatio = img.width/img.height;
-                    if(imageRatio != shellRatio)
-                        ShowNotification("Warning: The aspect ratio of the image uploaded does not match the ratio of the available space!");
+                var imageRatio = img.width / img.height;
+                if((Math.abs(imageRatio - shellRatio)) > 3)
+                    ShowNotification("Warning: The aspect ratio of the image uploaded does not match the ratio of the available space!");
 
-                    var canvasHeight = shellWidth/shellRatio;
+                var canvasHeight = shellWidth / shellRatio;
 
-                    if(img.width > activeDevice.width)
-                        img.width = activeDevice.width;
-                    if(img.height > activeDevice.height)
-                        img.height = activeDevice.height;
-                    if(img.width < activeDevice.width)
-                        img.width = activeDevice.width;
-                    if(img.height < activeDevice.height)
-                        img.height = activeDevice.height;
-                           
-                    canvas.style.height = canvasHeight+"px";
-                    canvas.width = shellWidth;
-                    canvas.height = canvasHeight;
+                if (img.width > activeDevice.width)
+                    img.width = activeDevice.width;
+                if (img.height > activeDevice.height)
+                    img.height = activeDevice.height;
+                if (img.width < activeDevice.width)
+                    img.width = activeDevice.width;
+                if (img.height < activeDevice.height)
+                    img.height = activeDevice.height;
 
-                    ctx.drawImage(img,activeDevice.xaxis,activeDevice.yaxis, activeDevice.width, activeDevice.height);
-                    ctx.drawImage(image, 0, 0, shellWidth, canvasHeight);
+                canvas.style.height = canvasHeight + "px";
+                canvas.width = shellWidth;
+                canvas.height = canvasHeight;
 
-                    if(multiFile)
-                        Download(document.getElementById('fileInput').files[index].name);
-                };
-                image.src= activeDevice.path;
-            }
-            img.src = reader.result;
+                ctx.drawImage(img, activeDevice.xaxis, activeDevice.yaxis, activeDevice.width, activeDevice.height);
+                ctx.drawImage(image, 0, 0, shellWidth, canvasHeight);
+            };
+            image.src = activeDevice.path;
         }
-        reader.readAsDataURL(fileInput.files[index]);
+        img.src = reader.result;
     }
+    reader.readAsDataURL(Dropzone.forElement(".dropzone").files[index]);
+}
 
-    function InitalizeImageLoader(){
-        var numFiles = document.getElementById('fileInput').files.length;
-        if(numFiles > 1)
-            multiFile = true;
-        else
-            multiFile = false;
-        for (i = 0; i < numFiles; ++i) {
-            ImageLoader(i);
-        }
-    }
+function InitializeImageLoader() {
+    var numFiles = Dropzone.forElement(".dropzone").files.length;
+    for (i = 0; i < numFiles; ++i) 
+        ImageLoader(i);
+}
 
-    function Download(fileName){
-        if(fileName == undefined)
-            fileName = document.getElementById('fileInput').files[0].name;
+function InitializeDownload() {
+    var numFiles = Dropzone.forElement(".dropzone").files.length;
+    for (i = 0; i < numFiles; ++i)
+        Download(Dropzone.forElement(".dropzone").files[i].name);
+}
 
-        var canvas = document.getElementById("image-canvas");
-        var image = canvas.toDataURL();  
+function Download(fileName) {
+    if (fileName == undefined)
+        fileName = Dropzone.forElement(".dropzone").files[0].name;
 
-        var tmpLink = document.createElement( 'a' );  
-        tmpLink.download = 'Bezel_' + fileName + '.png';  
-        tmpLink.href = image;  
+    var canvas = document.getElementById("image-canvas");
+    var image = canvas.toDataURL();
 
-        document.body.appendChild( tmpLink );  
-        tmpLink.click();  
-        document.body.removeChild( tmpLink );  
-    }
+    var tmpLink = document.createElement('a');
+    tmpLink.download = 'Bezel_' + fileName + '.png';
+    tmpLink.href = image;
 
-    function ShowNotification(message){
-        document.getElementById("notificationDiv").innerHTML = message;
-        $("#notificationDiv").show().delay(5000).fadeOut();
-    }
+    document.body.appendChild(tmpLink);
+    tmpLink.click();
+    document.body.removeChild(tmpLink);
+}
 
-    function OnLoad(){
-        var fileInput = document.getElementById('fileInput');
-        fileInput.addEventListener('change', InitalizeImageLoader, false);
+function ShowNotification(message) {
+    document.getElementById("notificationDiv").innerHTML = message;
+    $("#notificationDiv").show().delay(5000).fadeOut();
+}
 
-        RenderDevice();    
-        PopulateDeviceDropdown();
-    }
+function Reset(){
+    Dropzone.forElement('.dropzone').removeAllFiles(true)
+    RenderDevice();
+}
 
+function OnLoad() {
+    var dropzone = Dropzone.forElement(".dropzone");
+    dropzone.on("addedfile", function (file) {
+        InitializeImageLoader();
+    });
+    dropzone.options.autoProcessQueue = false;
+
+    RenderDevice();
+}
+
+$(document).ready(function () {
     OnLoad();
+});
 </script>
-</html>
